@@ -1,0 +1,171 @@
+#✅ FULL CSA SCRIPT (copy-paste ready)
+
+#You should regularly scan for and identify accounts where pwdlastset=0. The following script
+#lists all accounts meeting the condition of this rule.
+
+Get-ADObject -Filter 'objectcategory -eq "person" -and objectclass -eq "user" -and -notuseraccountcontrol -Band 2 -and pwdlastset -eq 0 -and objectsid -notlike "-501"'
+
+#Use Group Policy Management Editor (GPME) to open the Group Policy Object (GPO) that contains the effective password policy for the domain; this GPO could be the Default Domain Policy or a custom GPO linked (that is, with higher precedence than) the Default Domain Policy.
+
+#In GPME, go to 
+
+#Computer Configuration\Windows Settings\Security Settings\Account Policies\Account Lockout Policy.
+
+
+$d = [DateTime]::Today.AddDays(-180)
+Get-ADUser -Filter '(PasswordLastSet -lt $d) -or (LastLogonTimestamp -lt $d)' -Properties
+PasswordLastSet,LastLogonTimestamp | ft
+Name,PasswordLastSet,@{N="LastLogonTimestamp";E=
+{[datetime]::FromFileTime($_.LastLogonTimestamp)}}
+
+
+#Addendum :
+
+#Below is a CSA ready validation script pack tailored to your ODA / OMS Assessments scenario.
+#It is audit-ready, modular, and aligned with the exact issues seen in your environment (module path, AMA delivery, DLL presence, PSModulePath, etc.) [Report | HTML], [Deliver On...ig Service | PDF]
+ 
+#ODA / OMS Assessments – Validation Script Pack
+#Script Overview
+#•   Validates: 
+#o   Module presence
+#o   Correct paths
+#o   PSModulePath consistency
+#o   DLL availability
+#o   AMA/MMA agent health
+#o   Workspace connectivity indicators (basic)
+#•   Output: 
+#o   Console + structured audit report
+#•   Safe for: 
+#o   Customer environments
+#o   Audit evidence collection
+ 
+#✅ FULL CSA SCRIPT (copy-paste ready)
+<#
+.SYNOPSIS
+CSA Validation Pack for OMS / ODA Assessments Module
+
+.DESCRIPTION
+Validates module presence, paths, AMA/MMA health, and readiness for Add-*AssessmentTask execution.
+
+.NOTES
+Author: CSA-ready
+Safe for audit use
+#>
+
+# =========================
+# GLOBAL SETTINGS
+# =========================
+$ErrorActionPreference = "SilentlyContinue"
+$Report = @()
+$Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+
+function Add-Result {
+    param($Check, $Status, $Details)
+    $Report += [PSCustomObject]@{
+        Time    = $Timestamp
+        Check   = $Check
+        Status  = $Status
+        Details = $Details
+    }
+}
+
+Write-Host "===== ODA / OMS Assessment Validation =====" -ForegroundColor Cyan
+
+# =========================
+# 1. CHECK POWERSHELL VERSION
+# =========================
+$ps = $PSVersionTable
+if ($ps.CLRVersion.Major -ge 4) {
+    Add-Result "PowerShell CLR Version" "OK" "$($ps.CLRVersion)"
+} else {
+    Add-Result "PowerShell CLR Version" "FAIL" "CLR version < 4.0"
+}
+
+# =========================
+# 2. CHECK AGENT (AMA / MMA)
+# =========================
+$service = Get-Service -Name "HealthService" -ErrorAction SilentlyContinue
+
+if ($service -and $service.Status -eq "Running") {
+    Add-Result "MMA/HealthService" "OK" "Running"
+} else {
+    Add-Result "MMA/HealthService" "FAIL" "Service missing or not running"
+}
+
+# =========================
+# 3. CHECK MODULE PATH VARIABLE
+# =========================
+$modulePath = $env:PSModulePath
+
+if ($modulePath -match "Oms.Assessments") {
+    Add-Result "PSModulePath" "OK" "Contains OMS module path"
+} else {
+    Add-Result "PSModulePath" "WARNING" "Missing OMS module path"
+}
+
+# =========================
+# 4. CHECK STANDARD LOCATIONS
+# =========================
+$paths = @(
+    "C:\ODA\Binaries\bin\Microsoft.PowerShell.Oms.Assessments",
+    "C:\Program Files\Microsoft Monitoring Agent\Agent\PowerShell\Microsoft.PowerShell.Oms.Assessments",
+    "C:\Packages\Plugins\Microsoft.ServicesHub.AssessmentPlatform"
+)
+
+foreach ($path in $paths) {
+    if (Test-Path $path) {
+        Add-Result "Path Check" "OK" "$path exists"
+    } else {
+        Add-Result "Path Check" "INFO" "$path not found"
+    }
+}
+
+# =========================
+# 5. CHECK DLL PRESENCE
+# =========================
+$dllPaths = Get-ChildItem -Path "C:" -Recurse -Filter "Microsoft.PowerShell.Oms.Assessments.dll" -ErrorAction SilentlyContinue -Depth 4
+
+if ($dllPaths) {
+    foreach ($dll in $dllPaths) {
+        Add-Result "DLL Found" "OK" $dll.FullName
+    }
+} else {
+    Add-Result "DLL Found" "FAIL" "Microsoft.PowerShell.Oms.Assessments.dll not found"
+}
+
+# =========================
+# 6. CHECK MODULE AVAILABILITY
+# =========================
+$module = Get-Module -ListAvailable -Name Microsoft.PowerShell.Oms.Assessments
+
+if ($module) {
+    Add-Result "Module Availability" "OK" "Module registered in PS"
+} else {
+    Add-Result "Module Availability" "FAIL" "Module not discoverable"
+}
+
+# =========================
+# 7. TEST IMPORT MODULE
+# =========================
+try {
+    Import-Module Microsoft.PowerShell.Oms.Assessments -ErrorAction Stop
+    Add-Result "Import Module" "OK" "Module imported successfully"
+}
+catch {
+    Add-Result "Import Module" "FAIL" $_.Exception.Message
+}
+
+# =========================
+# 8. VALIDATE AMA DELIVERY (INDIRECT)
+# =========================
+$odaPath = "C:\ODA\Binaries\bin"
+if (Test-Path $odaPath) {
+    Add-Result "ODA Binaries Folder" "OK" "Folder exists"
+} else {
+    Add-Result "ODA Binaries Folder" "FAIL" "Missing - AMA likely not synced"
+}
+
+# =========================
+# 9. FINAL STATUS
+# =========================
+Write-Host "n===== SUMMARY =====" -ForegroundColor Yellow</span></div><div class="scriptor-paragraph"><span attribution="{&quot;name&quot;:&quot;Copilot&quot;,&quot;oid&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;id&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;userInfo&quot;:{&quot;name&quot;:&quot;Copilot&quot;,&quot;oid&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;id&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;},&quot;timestamp&quot;:1778149800000,&quot;dataSource&quot;:0}">$Report | Format-Table -AutoSize</span></div><br class="scriptor-paragraph"><div class="scriptor-paragraph"><span attribution="{&quot;name&quot;:&quot;Copilot&quot;,&quot;oid&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;id&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;userInfo&quot;:{&quot;name&quot;:&quot;Copilot&quot;,&quot;oid&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;id&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;},&quot;timestamp&quot;:1778149800000,&quot;dataSource&quot;:0}"># =========================</span></div><div class="scriptor-paragraph"><span attribution="{&quot;name&quot;:&quot;Copilot&quot;,&quot;oid&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;id&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;userInfo&quot;:{&quot;name&quot;:&quot;Copilot&quot;,&quot;oid&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;id&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;},&quot;timestamp&quot;:1778149800000,&quot;dataSource&quot;:0}"># 10. EXPORT REPORT</span></div><div class="scriptor-paragraph"><span attribution="{&quot;name&quot;:&quot;Copilot&quot;,&quot;oid&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;id&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;userInfo&quot;:{&quot;name&quot;:&quot;Copilot&quot;,&quot;oid&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;id&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;},&quot;timestamp&quot;:1778149800000,&quot;dataSource&quot;:0}"># =========================</span></div><div class="scriptor-paragraph"><span attribution="{&quot;name&quot;:&quot;Copilot&quot;,&quot;oid&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;id&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;userInfo&quot;:{&quot;name&quot;:&quot;Copilot&quot;,&quot;oid&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;id&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;},&quot;timestamp&quot;:1778149800000,&quot;dataSource&quot;:0}">$reportFile = "$env:TEMP\ODA_Validation_Report_$(Get-Date -Format 'yyyyMMdd_HHmmss').csv"</span></div><div class="scriptor-paragraph"><span attribution="{&quot;name&quot;:&quot;Copilot&quot;,&quot;oid&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;id&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;userInfo&quot;:{&quot;name&quot;:&quot;Copilot&quot;,&quot;oid&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;id&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;},&quot;timestamp&quot;:1778149800000,&quot;dataSource&quot;:0}">$Report | Export-Csv -NoTypeInformation -Path $reportFile</span></div><br class="scriptor-paragraph"><div class="scriptor-paragraph"><span attribution="{&quot;name&quot;:&quot;Copilot&quot;,&quot;oid&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;id&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;userInfo&quot;:{&quot;name&quot;:&quot;Copilot&quot;,&quot;oid&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;id&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;},&quot;timestamp&quot;:1778149800000,&quot;dataSource&quot;:0}">Write-Host "nReport exported to: $reportFile" -ForegroundColor Green

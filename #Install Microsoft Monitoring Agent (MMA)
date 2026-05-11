@@ -1,0 +1,102 @@
+#Install Microsoft Monitoring Agent (MMA)
+ 
+# ==========================================
+# Microsoft Monitoring Agent Installer
+# ==========================================
+
+# Official Microsoft MMA Download
+$MMAInstallerUrl = "https://go.microsoft.com/fwlink/?LinkId=828603"
+
+# Temp installer path
+$InstallerPath = "$env:TEMP\MMASetup-AMD64.exe"
+
+# Optional Log Analytics Workspace Info
+$WorkspaceID  = "<YOUR_WORKSPACE_ID>"
+$WorkspaceKey = "<YOUR_WORKSPACE_KEY>"
+
+# ==========================================
+# TLS 1.2 Enforcement
+# ==========================================
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+# ==========================================
+# Download MMA Installer
+# ==========================================
+Write-Host "Downloading Microsoft Monitoring Agent..."
+
+Invoke-WebRequest `
+    -Uri $MMAInstallerUrl `
+    -OutFile $InstallerPath `
+    -UseBasicParsing
+
+# ==========================================
+# Verify Download
+# ==========================================
+if (!(Test-Path $InstallerPath)) {
+    Write-Error "MMA installer download failed."
+    exit 1
+}
+
+Write-Host "Download completed successfully."
+
+# ==========================================
+# Silent Install
+# ==========================================
+Write-Host "Installing MMA Agent..."
+
+$Arguments = @(
+    "/qn"
+    "NOAPM=1"
+    "AcceptEndUserLicenseAgreement=1"
+    "ADD_OPINSIGHTS_WORKSPACE=1"
+    "OPINSIGHTS_WORKSPACE_ID=$WorkspaceID"
+    "OPINSIGHTS_WORKSPACE_KEY=$WorkspaceKey"
+)
+
+Start-Process `
+    -FilePath $InstallerPath `
+    -ArgumentList $Arguments `
+    -Wait
+
+# ==========================================
+# Validate Installation
+# ==========================================
+Write-Host "Validating installation..."
+
+$Service = Get-Service HealthService -ErrorAction SilentlyContinue
+
+if ($Service) {
+    Write-Host "HealthService detected." -ForegroundColor Green
+    Write-Host "Service Status: $($Service.Status)"
+} else {
+    Write-Host "HealthService service not found." -ForegroundColor Red
+}
+
+# Registry Validation
+$RegPath = "HKLM:\SYSTEM\CurrentControlSet\Services\HealthService"
+
+if (Test-Path $RegPath) {
+    Write-Host "Registry path exists." -ForegroundColor Green
+} else {
+    Write-Host "Registry path missing." -ForegroundColor Red
+}
+
+# ==========================================
+# Display Install Location
+# ==========================================
+$InstallFolder = "C:\Program Files\Microsoft Monitoring Agent"
+
+if (Test-Path $InstallFolder) {
+    Write-Host "Install Folder Found:"
+    Write-Host $InstallFolder -ForegroundColor Cyan
+}
+
+Write-Host "MMA installation process completed."
+
+
+
+## User-assigned managed identity
+Set-AzVMExtension -Name AzureMonitorWindowsAgent -ExtensionType AzureMonitorWindowsAgent -Publisher Microsoft.Azure.Monitor -ResourceGroupName <resource-group-name> -VMName <virtual-machine-name> -Location <location> -TypeHandlerVersion <version-number> -EnableAutomaticUpgrade $true -SettingString '{"authentication":{"managedIdentity":{"identifier-name":"mi_res_id","identifier-value":"/subscriptions/<my-subscription-id>/resourceGroups/<my-resource-group>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/<my-user-assigned-identity>"}}}'
+
+## System-assigned managed identity
+Set-AzVMExtension -Name AzureMonitorWindowsAgent -ExtensionType AzureMonitorWindowsAgent -Publisher Microsoft.Azure.Monitor -ResourceGroupName <resource-group-name> -VMName <virtual-machine-name> -Location <location> -TypeHandlerVersion <version-number> -EnableAutomaticUpgrade $true

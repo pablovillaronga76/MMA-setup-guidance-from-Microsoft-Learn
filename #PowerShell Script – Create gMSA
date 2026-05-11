@@ -1,0 +1,76 @@
+#PowerShell Script – Create gMSA
+
+<#
+.SYNOPSIS
+    Creates a Group Managed Service Account (gMSA) for ODA or other services.
+
+.REQUIREMENTS
+    - Windows Server 2012 or later
+    - Active Directory module for PowerShell
+    - Domain functional level 2012 or higher
+    - Run as Domain Admin
+#>
+
+# Variables - CHANGE THESE
+$gmsaName        = "gmsaODA"                  # Name of the gMSA (without $)
+$dnsHostName     = "$gmsaName.contoso.local"   # FQDN for the gMSA
+$allowedComputers = @("ODA-SERVER1$", "ODA-SERVER2$") # Computers allowed to use the gMSA
+$serviceSPNs     = @("HTTP/oda.contoso.local") # Optional SPNs for Kerberos
+
+Import-Module ActiveDirectory
+
+try {
+    # 1. Ensure KDS Root Key exists (needed for gMSA password generation)
+    if (-not (Get-KdsRootKey -ErrorAction SilentlyContinue)) {
+        Write-Host "Creating KDS Root Key..." -ForegroundColor Yellow
+        Add-KdsRootKey -EffectiveImmediately
+        Write-Host "KDS Root Key created."
+    } else {
+        Write-Host "KDS Root Key already exists." -ForegroundColor Green
+    }
+
+    # 2. Create Security Group for allowed computers
+    $groupName = "${gmsaName}_AllowedHosts"
+    if (-not (Get-ADGroup -Filter "Name -eq '$groupName'" -ErrorAction SilentlyContinue)) {
+        New-ADGroup -Name $groupName -GroupScope Global -GroupCategory Security -Path "CN=Managed Service Accounts,DC=domain,DC=local"
+        Write-Host "Security group '$groupName' created."
+    } else {
+        Write-Host "Security group '$groupName' already exists." -ForegroundColor Green
+    }
+
+    # Add allowed computers to the group
+    foreach ($comp in $allowedComputers) {
+        Add-ADGroupMember -Identity $groupName -Members $comp -ErrorAction SilentlyContinue
+    }
+
+    # 3. Create the gMSA
+    if (-not (Get-ADServiceAccount -Identity $gmsaName -ErrorAction SilentlyContinue)) {
+        New-ADServiceAccount -Name $gmsaName `
+            -DNSHostName $dnsHostName `
+            -PrincipalsAllowedToRetrieveManagedPassword $groupName `
+            -ServicePrincipalNames $serviceSPNs
+        Write-Host "gMSA '$gmsaName' created successfully." -ForegroundColor Green
+    } else {
+        Write-Host "gMSA '$gmsaName' already exists." -ForegroundColor Green
+    }
+
+    # 4. Install gMSA on the local machine (run this on each allowed server)
+    if (Test-ADServiceAccount $gmsaName) {
+        Write-Host "gMSA '$gmsaName' is already installed on this machine." -ForegroundColor Green
+    } else {
+        Install-ADServiceAccount -Identity $gmsaName
+        Write-Host "gMSA '$gmsaName' installed on this machine." -ForegroundColor Green
+    }
+
+    # 5. Test gMSA
+    if (Test-ADServiceAccount $gmsaName) {
+        Write-Host "gMSA '$gmsaName' is working correctly." -ForegroundColor Green
+    } else {
+        Write-Host "gMSA '$gmsaName' test failed." -ForegroundColor Red
+    }
+
+} catch {
+    Write-Error "Error: $_"
+}
+
+Installing the Active Directory Module in PowerShell
