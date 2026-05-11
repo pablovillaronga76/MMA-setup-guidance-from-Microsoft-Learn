@@ -1,0 +1,146 @@
+<# #MMA setup guidance from Microsoft Learn
+•   Legacy MMA information from Microsoft DevBlogs
+ 
+⚠️ Important
+Microsoft Monitoring Agent is deprecated.
+Microsoft recommends migration to:
+•   Azure Monitor Agent
+for:
+•   Azure Monitor
+•   Sentinel
+•   Defender integrations
+•   Log Analytics
+ 
+Optional Upgrades I Can Build
+•   Azure Arc + AMA deployment
+•   Intune Win32 package
+•   SCCM deployment
+•   Full health remediation toolkit
+•   Automatic MMA → AMA migration
+•   Offline installation package
+•   Proxy-aware enterprise installer
+•   Detection/remediation script for Azure Policy
+
+#>
+
+#Install and manage the Azure Monitor Agent
+#https://learn.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-manage?tabs=azure-powershell
+
+# AMA: 
+# Install module AMA
+# To install the Azure Monitor Agent (AMA), follow these steps:
+# 1.  Ensure your Azure virtual machine or Azure Arc-enabled server meets the prerequisites.
+# 2.  Use the Azure extension framework to install the AMA on your machine.
+# 3.  Create a Data Collection Rule (DCR) to define the data to be collected.
+#4.  Associate the DCR with the AMA to start collecting data.
+#For detailed instructions and additional requirements, refer to the official Azure documentation on installing and managing the Azure Monitor Agent. 
+
+#AMA Script
+#Use this official Microsoft redirect URL for the legacy MMA installer:
+#https://go.microsoft.com/fwlink/?LinkId=828603
+#Here is the corrected full PowerShell installer using the proper Microsoft download URL.
+ 
+Pre Req 
+
+https://learn.microsoft.com/en-us/services-hub/unified/health/assessment_prereq_docs/ama/prereqsadassessment.pdf
+
+Ref:  AMA/ MMS
+https://learn.microsoft.com/en-us/services-hub/unified/health/assessments-troubleshooting-ama
+
+Getting started:
+https://learn.microsoft.com/en-us/services-hub/unified/health/getting-started-ad
+#>
+
+# Install Microsoft Monitoring Agent (MMA)
+# ==========================================
+# Microsoft Monitoring Agent Installer
+# ==========================================
+
+# Official Microsoft MMA Download
+$MMAInstallerUrl = "https://go.microsoft.com/fwlink/?LinkId=828603"
+
+# Temp installer path
+$InstallerPath = "$env:TEMP\MMASetup-AMD64.exe"
+
+# Optional Log Analytics Workspace Info
+$WorkspaceID  = "<YOUR_WORKSPACE_ID>"
+$WorkspaceKey = "<YOUR_WORKSPACE_KEY>"
+
+# ==========================================
+# TLS 1.2 Enforcement
+# ==========================================
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+# ==========================================
+# Download MMA Installer
+# ==========================================
+Write-Host "Downloading Microsoft Monitoring Agent..."
+
+Invoke-WebRequest `
+    -Uri $MMAInstallerUrl `
+    -OutFile $InstallerPath `
+    -UseBasicParsing
+
+# ==========================================
+# Verify Download
+# ==========================================
+if (!(Test-Path $InstallerPath)) {
+    Write-Error "MMA installer download failed."
+    exit 1
+}
+
+Write-Host "Download completed successfully."
+
+# ==========================================
+# Silent Install
+# ==========================================
+Write-Host "Installing MMA Agent..."
+
+$Arguments = @(
+    "/qn"
+    "NOAPM=1"
+    "AcceptEndUserLicenseAgreement=1"
+    "ADD_OPINSIGHTS_WORKSPACE=1"
+    "OPINSIGHTS_WORKSPACE_ID=$WorkspaceID"
+    "OPINSIGHTS_WORKSPACE_KEY=$WorkspaceKey"
+)
+
+Start-Process `
+    -FilePath $InstallerPath `
+    -ArgumentList $Arguments `
+    -Wait
+
+# ==========================================
+# Validate Installation
+# ==========================================
+Write-Host "Validating installation..."
+
+$Service = Get-Service HealthService -ErrorAction SilentlyContinue
+
+if ($Service) {
+    Write-Host "HealthService detected." -ForegroundColor Green
+    Write-Host "Service Status: $($Service.Status)"
+} else {
+    Write-Host "HealthService service not found." -ForegroundColor Red
+}
+
+# Registry Validation
+$RegPath = "HKLM:\SYSTEM\CurrentControlSet\Services\HealthService"
+
+if (Test-Path $RegPath) {
+    Write-Host "Registry path exists." -ForegroundColor Green
+} else {
+    Write-Host "Registry path missing." -ForegroundColor Red
+}
+
+# ==========================================
+# Display Install Location
+# ==========================================
+$InstallFolder = "C:\Program Files\Microsoft Monitoring Agent"
+
+if (Test-Path $InstallFolder) {
+    Write-Host "Install Folder Found:"
+    Write-Host $InstallFolder -ForegroundColor Cyan
+}
+
+Write-Host "MMA installation process completed."
